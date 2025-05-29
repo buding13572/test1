@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025年伊比利半島大停電互動分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices:
+        - Report Info: Event Overview (Date, Time, Scope, Scale), Executive Summary, Report Purpose -> Goal: Inform -> Viz/Presentation: Key stats display (HTML), Summary text, Purpose text -> Interaction: Static display -> Justification: Quick understanding of the event's magnitude and report's aim -> Library/Method: HTML, Tailwind.
+        - Report Info: Detailed Timeline (Pre-event, Cascade, Recovery), Table 2 (Key Timeline Events) -> Goal: Show Sequence & Key Data -> Viz/Presentation: Interactive vertical timeline (HTML/CSS/JS), Bar chart for initial power loss (Chart.js) -> Interaction: Click timeline events for details, hover on chart bars -> Justification: Clear visualization of event progression and key moments; power loss chart quantifies the immediate electrical impact -> Library/Method: HTML, Tailwind, JS, Chart.js.
+        - Report Info: Widespread Disruptions (Transport, Comms, Finance, Daily Life), Table 1 (Key Indicators) -> Goal: Show Impact & Key Data -> Viz/Presentation: Categorized expandable sections (HTML/JS), Donut chart for estimated disconnected load (Spain vs. Portugal) (Chart.js) -> Interaction: Click to expand/collapse details -> Justification: Organized presentation of diverse impacts, allowing users to explore areas of interest; chart offers quantitative comparison of impact distribution -> Library/Method: HTML, Tailwind, JS, Chart.js.
+        - Report Info: Systemic Vulnerabilities (Inertia, Interconnection, Aging Grid, Renewable Integration Challenges like Duck Curve & Storage) -> Goal: Explain Causes -> Viz/Presentation: Explanatory text, simple HTML/CSS diagrams (e.g., inertia concept, Iberia interconnection 'map'), Duck Curve (Chart.js), BESS capacity comparison bar chart (Chart.js) -> Interaction: Hover for tooltips on diagrams, interactive charts -> Justification: Makes complex technical concepts understandable; visual aids for abstract ideas; charts quantify specific issues like storage disparity -> Library/Method: HTML, Tailwind, JS, Chart.js.
+        - Report Info: Conclusions & Recommendations -> Goal: Inform Solutions -> Viz/Presentation: Categorized expandable sections (HTML/JS), LLM-powered detailed analysis -> Interaction: Click to expand/collapse details, click "深入分析" button to trigger LLM call -> Justification: Clear, actionable presentation of proposed solutions, grouped by theme for easy understanding; LLM provides deeper insights and challenges -> Library/Method: HTML, Tailwind, JS, Chart.js, Gemini API.
+        -->
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f9fafb; /* Light Gray background */
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-color: #3b82f6; /* Blue-500 */
+            color: #3b82f6;
+            background-color: #eff6ff; /* Blue-50 */
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .timeline-item {
+            position: relative;
+            padding-left: 30px;
+            margin-bottom: 20px;
+            border-left: 2px solid #e5e7eb; /* Gray-200 */
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -9px;
+            top: 0;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #3b82f6; /* Blue-500 */
+            border: 2px solid #fff;
+        }
+        .expandable-title {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .expandable-content {
+            display: none;
+            padding-top: 0.5rem;
+            padding-left: 1rem;
+            border-left: 2px solid #d1d5db; /* Gray-300 */
+            margin-left: 0.5rem;
+        }
+        .expand-icon::after {
+            content: '▼'; /* Down arrow */
+            font-size: 0.8em;
+            margin-left: 0.5rem;
+            transition: transform 0.3s ease;
+        }
+        .expanded .expand-icon::after {
+            transform: rotate(180deg); /* Up arrow */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .stat-card {
+            background-color: #fff;
+            border: 1px solid #e5e7eb; /* Gray-200 */
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .inertia-comparison div {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .interconnection-map {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 2px solid #60a5fa; /* blue-400 */
+            border-radius: 10px;
+            background-color: #eff6ff; /* blue-50 */
+            text-align: center;
+        }
+        .interconnection-map .country {
+            padding: 10px;
+            margin: 5px;
+            background-color: #bfdbfe; /* blue-200 */
+            border-radius: 5px;
+        }
+        .interconnection-map .connection {
+            height: 3px;
+            background-color: #ef4444; /* red-500 - weak connection */
+            margin: 10px auto;
+            width: 30%;
+        }
+         .interconnection-map .strong-connection {
+            background-color: #22c55e; /* green-500 - strong connection */
+            width: 60%;
+        }
+
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">2025年伊比利半島大停電互動分析</h1>
+            <p class="text-slate-600 mt-2">深入解析事件、影響、原因與未來展望</p>
+        </header>
+
+        <nav class="mb-8 flex flex-wrap justify-center gap-2 sm:gap-4">
+            <button data-tab="overview" class="tab-button active text-sm sm:text-base font-medium py-2 px-3 sm:px-4 border-b-2 border-transparent hover:border-sky-500 hover:text-sky-600 rounded-t-md">事件總覽</button>
+            <button data-tab="timeline" class="tab-button text-sm sm:text-base font-medium py-2 px-3 sm:px-4 border-b-2 border-transparent hover:border-sky-500 hover:text-sky-600 rounded-t-md">時間軸與影響</button>
+            <button data-tab="causes" class="tab-button text-sm sm:text-base font-medium py-2 px-3 sm:px-4 border-b-2 border-transparent hover:border-sky-500 hover:text-sky-600 rounded-t-md">原因與脆弱性</button>
+            <button data-tab="recommendations" class="tab-button text-sm sm:text-base font-medium py-2 px-3 sm:px-4 border-b-2 border-transparent hover:border-sky-500 hover:text-sky-600 rounded-t-md">結論與建議</button>
+        </nav>
+
+        <main>
+            <section id="overview" class="content-section active bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold text-sky-600 mb-4">事件總覽</h2>
+                <p class="mb-4 text-slate-700">本節提供2025年4月28日伊比利半島大規模停電事件的總體概況，包括其影響範圍、初步調查結果，以及此次事件對於電網韌性和能源轉型的重要性。這是一次前所未有的系統性衝擊，揭示了現代社會對電力的高度依賴及能源基礎設施的潛在脆弱性。</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="stat-card bg-amber-50 border-amber-200">
+                        <h3 class="text-xl font-semibold text-amber-700 mb-1">影響日期</h3>
+                        <p class="text-2xl font-bold text-amber-600">2025年4月28日</p>
+                    </div>
+                    <div class="stat-card bg-rose-50 border-rose-200">
+                        <h3 class="text-xl font-semibold text-rose-700 mb-1">總斷開負荷</h3>
+                        <p class="text-2xl font-bold text-rose-600">約 30 GW</p>
+                         <p class="text-sm text-slate-500">(伊比利半島)</p>
+                    </div>
+                    <div class="stat-card bg-sky-50 border-sky-200">
+                        <h3 class="text-xl font-semibold text-sky-700 mb-1">主要影響區域</h3>
+                        <p class="text-lg font-bold text-sky-600">西班牙、葡萄牙全境</p>
+                        <p class="text-sm text-slate-500">(短暫波及安道爾、法國南部)</p>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-100 p-4 rounded-md mb-6">
+                    <h3 class="text-xl font-semibold text-slate-700 mb-2">執行摘要</h3>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed">
+                        2025年4月28日發生在伊比利半島的大規模停電事件，影響西班牙、葡萄牙全境，並短暫波及鄰近地區，造成嚴重癱瘓。初步調查指向西班牙南部發電量驟降，導致電網頻率急劇下降及電壓升高，最終觸發保護機制，使伊比利半島電網與歐洲大陸電網斷開。事件凸顯了能源基礎設施的脆弱性，特別是電網韌性不足、與歐洲互聯有限，以及高比例再生能源併網後系統慣性不足等結構性問題。儘管應急響應迅速，但事件也揭示了社會對電力的高度依賴及危機應對的差距。本應用旨在分析此事件，並提出提升能源安全的建議。
+                    </p>
+                </div>
+
+                 <div class="bg-slate-100 p-4 rounded-md">
+                    <h3 class="text-xl font-semibold text-slate-700 mb-2">報告目的</h3>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed">
+                        本互動分析旨在對此次事件進行全面剖析，超越最初的臆測，以確定已證實的事實和促成因素。我們將評估即時響應和恢復工作，指出成功之處和面臨的挑戰。更重要的是，從這次前所未有的事件中汲取關鍵教訓，特別是關於電網韌性、再生能源整合和應急準備方面。最終，本分析將提供可行的觀察與啟示，供政策制定者、電網運營商和其他利益相關者參考，以增強伊比利半島乃至整個歐洲的能源安全，並預防未來大規模停電事件的發生。
+                    </p>
+                </div>
+            </section>
+
+            <section id="timeline" class="content-section bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold text-sky-600 mb-4">時間軸與影響</h2>
+                <p class="mb-6 text-slate-700">本節詳細梳理了停電事件的發展過程，從事件前的系統狀態、連鎖故障的發生，到初步的恢復工作。同時，也將展示此次大範圍中斷對交通、通訊、金融服務及民眾日常生活的具體影響。</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-700 mb-3">關鍵事件時序</h3>
+                        <div class="space-y-4">
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-blue-600">12:03 - 12:21 CET</h4>
+                                <p class="text-sm text-slate-600">歐洲大陸同步區域觀測到兩段功率/頻率波動；TSO採取緩解措施。</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-blue-600">12:32:57 - 12:33:17 CET</h4>
+                                <p class="text-sm text-slate-600">西班牙南部發生一系列發電跳閘 (估計2200 MW)；西班牙/葡萄牙頻率下降，電壓升高。</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-red-600">12:33:18 - 12:33:21 CET</h4>
+                                <p class="text-sm text-slate-600">伊比利半島頻率持續下降至48.0 Hz；自動卸載啟動。</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-red-600">12:33:21 CET</h4>
+                                <p class="text-sm text-slate-600">法國與西班牙之間的交流架空線路被保護裝置斷開。</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-red-700">12:33:24 CET</h4>
+                                <p class="text-sm text-slate-600">伊比利電力系統完全崩潰；法國與西班牙之間的高壓直流線路停止輸電。</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h4 class="font-semibold text-green-600">12:44 CET</h4>
+                                <p class="text-sm text-slate-600">第一條400 kV線路 (法國-西班牙，西部) 重新通電。</p>
+                            </div>
+                             <div class="timeline-item">
+                                <h4 class="font-semibold text-green-600">4月29日清晨</h4>
+                                <p class="text-sm text-slate-600">西班牙99%以上電力恢復；葡萄牙89個變電站恢復。</p>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-slate-500">點擊各時間點（未來可擴充功能）可查看更詳細資訊。</p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-700 mb-3">初步發電量損失</h3>
+                        <div class="chart-container">
+                            <canvas id="powerLossChart"></canvas>
+                        </div>
+                        <p class="mt-2 text-center text-sm text-slate-600">西班牙電網在短短數秒內損失巨大發電量。</p>
+
+                        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">廣泛中斷</h3>
+                        <ul class="space-y-3">
+                            <li>
+                                <div class="expandable-title bg-slat
